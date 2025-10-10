@@ -1,0 +1,12 @@
+import { Server, Socket } from "socket.io";
+import { RoomController } from "@controller/room.controller";
+
+export default function roomEvents(io: Server, socket: Socket) {
+  socket.on("join_room", async (payload) => {
+    await RoomController.joinRoom(io, socket, payload);
+  });
+
+  socket.on("leave_room", async (payload) => {
+    await RoomController.leaveRoom(io, socket, payload);
+  });
+}
