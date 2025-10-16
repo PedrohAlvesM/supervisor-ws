@@ -22,11 +22,6 @@ LogController.LogEvent('WS Server', `Server running on ${process.env.SERVER_HOST
 
 connectRedis();
 
-io.on('connection', (socket) => {
-  LogController.LogEvent('WS Server', `Student connects socketID: ${socket.id}`);
-  registerEvents(io, socket);
-});
-
 httpsServer.listen(PORT), () => {
   LogController.LogEvent('Socket.io server', `Socket.io HTTPS Server running at ${process.env.SERVER_HOST}:${PORT}`);
 };

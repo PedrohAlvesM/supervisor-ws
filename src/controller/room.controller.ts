@@ -12,10 +12,9 @@ interface Result {
 // Schema do payload de entrada
 const toConnectSchema = z.object({
   roomId: z.string().trim().length(8),
-  toJoin: z.union([
-    studentSchema,
-    instructorSchema
-  ]),
+  id: z.string().min(1),
+  name: z.string().min(1),
+  role: z.enum(["student", "instructor"])
 });
 
 export const RoomController = {
@@ -28,16 +27,17 @@ export const RoomController = {
   },
 
   async joinRoom(io: Server, socket: Socket, payload: unknown): Promise<void> {
+    LogController.LogEvent("Join Room", `Socket tentando entrar na sala: ${JSON.stringify(payload)}`);
     const parsed = toConnectSchema.safeParse(payload);
     if (!parsed.success) {
       io.to(socket.id).emit("error", {
         success: false,
-        message: "RoomID invalid or Student/Instructor invalid",
+        message: parsed.error,
       });
       return;
     }
 
-    const { roomId, toJoin } = parsed.data;
+    const { roomId, role, id, name } = parsed.data;
     const auth = await this.authenticateRoom(roomId);
     if (!auth.success) {
       io.to(socket.id).emit("error", {
@@ -50,13 +50,14 @@ export const RoomController = {
     const room: Room = auth.data;
     socket.join(room.id);
 
-    if ("studentId" in toJoin) {
-      const student = toJoin as Student;
-      room.students.set(toJoin.id, student);
+    if (role === 'student') {
+      const student = {id, name};
+      room.students.set(socket.id, student);
       await RedisController.setRoom(room);
       LogController.LogEvent("RoomController", `Student ${student.id} connected to Room ${roomId}`);
     } else {
-      const instructor = toJoin as Instructor;
+      const instructor = {id, name};
+      instructor.id = socket.id
       room.instructor = instructor;
       await RedisController.setRoom(room);
       LogController.LogEvent("RoomController", `Instructor ${instructor.id} connected to Room ${roomId}`);

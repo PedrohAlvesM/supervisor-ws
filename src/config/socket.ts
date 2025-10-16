@@ -3,6 +3,7 @@ import http from "http";
 import dotenv from 'dotenv';
 import { LogController } from "@controller/log.controller";
 import { readFileSync } from "fs";
+import registerEvents from "@events/*";
 
 dotenv.config();
 const HOST = process.env.SERVER_HOST;
@@ -17,6 +18,7 @@ export default function createSocketServer(server: http.Server) {
 
   io.on("connection", (socket) => {
     LogController.LogEvent('Socket', `Connected: ${socket.id}`);
+    registerEvents(io, socket);
 
     socket.on("disconnect", () => {
       LogController.LogEvent('Socket', `Disconnected: ${socket.id}`);

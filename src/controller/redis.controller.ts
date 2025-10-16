@@ -1,5 +1,9 @@
 import { redisStore } from "@config/redis";
-import { Student, Room, Instructor, studentSchema, instructorSchema, roomSchema } from "@typesWs/room";
+import { Student, Room, Instructor, studentSchema, instructorSchema, roomSchema, rawRoomSchema, RawRoom } from "@typesWs/room";
+import dotenv from "dotenv";
+import { LogController } from "./log.controller";
+
+dotenv.config();
 
 export const RedisController = {
   async setKey<T>(key: string, value: T, expireSeconds?: number): Promise<void> {
@@ -14,16 +18,22 @@ export const RedisController = {
   },
 
   async setRoom(room: Room): Promise<void> {
-    roomSchema.parse(room);
-    await this.setKey<Room>(`room:${room.id}`, room);
+    const roomForStorage = {
+        ...room,
+        students: Object.fromEntries(room.students),
+    };
+    const r = rawRoomSchema.parse(roomForStorage);
+    await this.setKey<RawRoom>(`${process.env.REDIS_PREFIX}-room:${room.id}`, r);
   },
 
   async getRoom(roomId: string): Promise<Room | null> {
-    const room = await this.getKey<Room>(`room:${roomId}`);
+    const room = await this.getKey<Room>(`${process.env.REDIS_PREFIX}-room:${roomId}`);
     if (!room) return null;
     try {
+      LogController.LogEvent("Dados de GetRoom", JSON.stringify(room));
       return roomSchema.parse(room);
-    } catch {
+    } catch (e) {
+      LogController.LogError("Redis GetRoom", JSON.stringify(e));
       return null;
     }
   },
@@ -52,7 +62,10 @@ export const RedisController = {
     if (!room) throw new Error(`Room ${roomId} not found`);
     studentSchema.parse(student);
 
-    room.students.set(student.id, student);
-    await this.setRoom(room);
+    if (student.id) {
+      room.students.set(student.id, student)
+      await this.setRoom(room);
+    }
+
   },
 };
