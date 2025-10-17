@@ -1,8 +1,9 @@
 import { Server, Socket } from "socket.io";
 import { RedisController } from "./redis.controller";
 import { z } from "zod";
-import { Room, Student, Instructor, studentSchema, instructorSchema } from "@typesWs/room";
+import { Room, ConnectPayload } from "@typesWs/room";
 import { LogController } from "./log.controller";
+import { studentContoller } from "./student.controller";
 interface Result {
   success: boolean;
   message: string;
@@ -48,53 +49,89 @@ export const RoomController = {
     }
 
     const room: Room = auth.data;
-    socket.join(room.id);
 
-    if (role === 'student') {
-      const student = {id, name};
-      room.students.set(socket.id, student);
-      await RedisController.setRoom(room);
-      LogController.LogEvent("RoomController", `Student ${student.id} connected to Room ${roomId}`);
-    } else {
-      const instructor = {id, name};
-      instructor.id = socket.id
-      room.instructor = instructor;
-      await RedisController.setRoom(room);
-      LogController.LogEvent("RoomController", `Instructor ${instructor.id} connected to Room ${roomId}`);
-    }
+    this.updateRoom(io, socket, "join", {roomId, id, name, role});
+
+    socket.join(room.id);
 
     io.to(socket.id).emit("join_room", {
       success: true,
       message: `Connected successfully`,
     });
-
-    io.to(roomId).emit("room_update", room);
   },
 
-  async leaveRoom(io: Server, socket: Socket, payload: { roomId: string; userId: string }): Promise<void> {
-    const { roomId, userId } = payload;
-
-    const room = await RedisController.getRoom(roomId);
+  async leaveRoom(io: Server, socket: Socket, payload: ConnectPayload): Promise<void> {
+    const room = await RedisController.getRoom(payload.roomId);
     if (!room) {
       io.to(socket.id).emit("error", { success: false, message: "Room not found" });
       return;
     }
 
-    if (room.instructor?.id === userId) {
-      room.instructor = { id: "", name: "" }; 
-      LogController.LogEvent("RoomController", `Instructor ${userId} left room ${roomId}`);
-    } else if (room.students.get(userId)) {
-      room.students.delete(userId);
-      LogController.LogEvent("RoomController", `Student ${userId} left room ${roomId}`);
-    }
+    this.updateRoom(io, socket, "leave", payload);
 
-    await RedisController.setRoom(room);
-    socket.leave(roomId);
+    socket.leave(payload.roomId);
 
-    io.to(roomId).emit("room_update", room);
     io.to(socket.id).emit("leave_room", {
       success: true,
-      message: `Left room ${roomId} successfully`,
+      message: `Left room ${payload.roomId} successfully`,
     });
   },
+
+  async updateRoom( io: Server, socket: Socket, action: 'join' | 'leave', payload?: ConnectPayload): Promise<void> {
+
+    const roomId = action === 'join' ? payload!.roomId : socket.data.roomId;
+    if (!roomId) {
+      LogController.LogError("UpdateRoom", `Action '${action}' failed for socket ${socket.id}: roomId is missing.`);
+      return;
+    }
+
+    const auth = await this.authenticateRoom(roomId);
+    if (!auth.success) {
+      LogController.LogEvent("UpdateRoom", `Room ${roomId} not found. No update performed.`);
+      return;
+    }
+
+    const room: Room = auth.data!;
+
+    if (action === 'join') {
+      if (!payload) {
+        LogController.LogError("UpdateRoom", `Join action for room ${roomId} failed: payload is missing.`);
+        return;
+      }
+
+      socket.data.roomId = roomId;
+      socket.data.role = payload.role;
+
+      if (payload.role === 'student') {
+        const student = { id: payload.id, name: payload.name };
+        studentContoller.reconnect(room, student);
+        room.students.set(socket.id, student);
+        LogController.LogEvent("UpdateRoom", `Student ${payload.name} (${socket.id}) JOINED Room ${roomId}`);
+      } else {
+        const instructor = { id: socket.id, name: payload.name };
+        room.instructor = instructor;
+        LogController.LogEvent("UpdateRoom", `Instructor ${payload.name} (${socket.id}) JOINED Room ${roomId}`);
+      }
+    } else {
+      if (socket.data.role === 'student' && room.students.has(socket.id)) {
+        const studentName = room.students.get(socket.id)?.name || 'Unknown';
+        room.students.delete(socket.id);
+        LogController.LogEvent("UpdateRoom", `Student ${studentName} (${socket.id}) LEFT Room ${roomId}`);
+      } else if (socket.data.role === 'instructor' && room.instructor?.id === socket.id) {
+        const instructorName = room.instructor.name;
+      
+        room.instructor = null;
+        LogController.LogEvent("UpdateRoom", `Instructor ${instructorName} (${socket.id}) LEFT Room ${roomId}`);
+      }
+    }
+  
+    await RedisController.setRoom(room);
+
+    const serializableRoom = {
+      ...room,
+      students: Object.fromEntries(room.students) // Map to object 
+    };
+
+    io.to(roomId).emit("room_update", serializableRoom);
+  }
 };

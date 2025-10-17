@@ -9,4 +9,8 @@ export default function roomEvents(io: Server, socket: Socket) {
   socket.on("leave_room", async (payload) => {
     await RoomController.leaveRoom(io, socket, payload);
   });
+
+  socket.on("room_update", async (payload) => {
+    await RoomController.updateRoom(io, socket, payload);
+  })
 }

@@ -13,7 +13,11 @@ export default function createSocketServer(server: http.Server) {
     cors: {
       origin: HOST, 
       methods: ["GET", "POST"]
-    }
+    },
+    connectionStateRecovery: {
+    maxDisconnectionDuration: 5 * 60 * 1000, // 5 min
+    skipMiddlewares: true,
+  }
   });
 
   io.on("connection", (socket) => {
