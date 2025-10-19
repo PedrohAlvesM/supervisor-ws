@@ -68,4 +68,22 @@ export const RedisController = {
     }
 
   },
+  async deleteRoom(roomId: string): Promise<boolean> {
+    const roomKey = `${process.env.REDIS_PREFIX}-room:${roomId}`;
+    try {
+      // The .del() command returns the number of keys that were removed.
+      const result = await redisStore.del(roomKey);
+
+      if (result > 0) {
+        LogController.LogEvent("Redis DeleteRoom", `Successfully deleted room: ${roomKey}`);
+        return true;
+      } else {
+        LogController.LogEvent("Redis DeleteRoom", `Room not found, no deletion needed: ${roomKey}`);
+        return false;
+      }
+    } catch (error) {
+      LogController.LogError("Redis DeleteRoom", `Error deleting room ${roomKey}: ${JSON.stringify(error)}`);
+      return false;
+    }
+},
 };

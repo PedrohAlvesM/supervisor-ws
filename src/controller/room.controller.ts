@@ -4,6 +4,7 @@ import { z } from "zod";
 import { Room, ConnectPayload } from "@typesWs/room";
 import { LogController } from "./log.controller";
 import { studentContoller } from "./student.controller";
+import { timerController } from "./timer.controller";
 interface Result {
   success: boolean;
   message: string;
@@ -133,5 +134,51 @@ export const RoomController = {
     };
 
     io.to(roomId).emit("room_update", serializableRoom);
+  },
+
+  async startTest(io: Server, socket: Socket, roomId: string) {
+    const idSchema = z.string().length(8)
+    const parse = idSchema.safeParse(roomId);
+
+    if (parse.error) {
+      return io.to(socket.id).emit("error", parse.error.message);
+    }
+
+    const auth = await this.authenticateRoom(parse.data!);
+    if (!auth.success) {
+      return io.to(socket.id).emit("error", auth.message);
+    }
+
+    const room: Room = auth.data;
+
+    if (room.status !== "waiting") {
+      return io.to(socket.id).emit("error", "Prova não pode começar porque a sala não estava no estado correto.");
+    } 
+    else if (socket.id !== room.instructor!.id) {
+      return io.to(socket.id).emit("error", "Você não tem permissão para iniciar a prova.")
+    }
+    room.status = "in_progress";
+    const serializableRoom = {
+      ...room,
+      students: Object.fromEntries(room.students) // Map to object 
+    };
+    await RedisController.setRoom(room);
+
+    timerController.startTimer(io, room.id, room.time_limit);
+
+    io.to(roomId).emit("room_update", serializableRoom);
+  },
+
+  async endTest(io: Server, roomId: string): Promise<void> {
+    const auth = await this.authenticateRoom(roomId);
+    if (!auth.success) return;
+
+    const room = auth.data!;
+    room.status = 'finished';
+
+    const serializableRoom = { ...room, students: Object.fromEntries(room.students) };
+    io.to(roomId).emit("room_update", serializableRoom);
+    LogController.LogEvent("RoomController", `Test in room ${roomId} has ended.`);
+    await RedisController.deleteRoom(room.id);
   }
 };
