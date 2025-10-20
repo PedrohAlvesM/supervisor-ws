@@ -12,12 +12,13 @@ export default function roomEvents(io: Server, socket: Socket) {
 
   socket.on("room_update", async (payload) => {
     await RoomController.updateRoom(io, socket, payload);
-  })
+  });
 
   socket.on("start_test", async (roomId) => {
     await RoomController.startTest(io, socket, roomId);
-  })
+  });
+
   socket.on("end_test", async (roomId) => {
     await RoomController.endTest(io, roomId);
-  })
+  });
 }

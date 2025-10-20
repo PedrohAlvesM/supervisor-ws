@@ -1,6 +1,8 @@
 
 export interface ClientMessage {
+    id: string;
     questionType: 'MultipleChoiceQuestion' | 'MultipleAnswerQuestion' | 'EssayQuestion' | 'CodeQuestion';
+    questionId: string;
     data: string | number[];
 }
 
