@@ -44,9 +44,17 @@ export const connectPayloadSchema = z.object({
         .min(2, "Name must be at least 2 characters long"),
 });
 
+export const studentOffTestStatusSchema = z.object({
+  status: z.boolean(),
+  roomId: z.string(),
+  studentId: z.string(),
+  instructorId: z.string(),
+});
+
 
 export type Student = z.infer<typeof studentSchema>;
 export type Instructor = z.infer<typeof instructorSchema>;
 export type Room = z.infer<typeof roomSchema>;
 export type RawRoom = z.infer<typeof rawRoomSchema>;
 export type ConnectPayload = z.infer<typeof connectPayloadSchema>;
+export type StudentOffTestStatus = z.infer<typeof studentOffTestStatusSchema>;
