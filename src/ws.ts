@@ -12,8 +12,8 @@ dotenv.config();
 const PORT = Number(process.env.WS_SERVER_PORT) || 3002;
 
 const httpsOptions = {
-  key: readFileSync('/usr/src/app/crt/server.key'), //container path
-  cert: readFileSync('/usr/src/app/crt/server.crt'), //container path
+  // key: readFileSync('/usr/src/app/crt/server.key'), //container path
+  // cert: readFileSync('/usr/src/app/crt/server.crt'), //container path
 };
 
 const httpsServer = createServer(httpsOptions);

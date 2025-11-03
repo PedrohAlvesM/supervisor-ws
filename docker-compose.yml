@@ -10,9 +10,9 @@ services:
     ports:
       - "${WS_SERVER_PORT}:3002"
     environment:
-      - NODE_ENV=development
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - NODE_ENV=${NODE_ENV}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
       - CHOKIDAR_USEPOLLING=true   
       - WS_SERVER_PORT
     env_file:
